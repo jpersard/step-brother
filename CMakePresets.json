@@ -43,9 +43,8 @@
       "displayName": "Windows - clang-cl",
       "inherits": "windows-base",
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-cl",
-        "VCPKG_TARGET_TRIPLET": "x64-windows-clangcl-release"
+        "VCPKG_TARGET_TRIPLET": "x64-windows-clangcl-release",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang-cl.cmake"
       }
     },
     {

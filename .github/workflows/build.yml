@@ -122,14 +122,27 @@ jobs:
             # C++-Laufzeit beilegen, damit kein VC++-Redistributable installiert sein muss
             Get-ChildItem "$env:VCToolsRedistDir\x64\Microsoft.VC*.CRT\*.dll" | Copy-Item -Destination $dist
           } else {
+            # Alle MinGW-Laufzeit-DLLs einsammeln, die exe und DLLs (rekursiv) brauchen
             $bin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'ucrt64\bin'
-            foreach ($dll in 'libstdc++-6.dll', 'libgcc_s_seh-1.dll', 'libwinpthread-1.dll') {
-              Copy-Item (Join-Path $bin $dll) $dist
-            }
+            $objdump = Join-Path $bin 'objdump.exe'
+            do {
+              $added = 0
+              $needed = Get-ChildItem $dist -Include *.exe, *.dll -Recurse | ForEach-Object {
+                & $objdump -p $_.FullName | Select-String 'DLL Name:\s*(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+              } | Sort-Object -Unique
+              foreach ($dll in $needed) {
+                $src = Join-Path $bin $dll
+                if ((Test-Path $src) -and -not (Test-Path (Join-Path $dist $dll))) {
+                  Copy-Item $src $dist; $added++; Write-Host "MinGW-Laufzeit: $dll"
+                }
+              }
+            } while ($added -gt 0)
           }
           Get-ChildItem $dist | Select-Object Name, Length | Format-Table -AutoSize
 
       - name: Rauchtest mit synthetischer Anlage
+        # Fehlt eine DLL, zeigt Windows einen Dialog und der Prozess wartet ewig - daher Zeitlimit.
+        timeout-minutes: 5
         run: |
           $dist = "dist/step-brother-m0-${{ matrix.preset }}"
           # Ohne MSYS2/VS im PATH testen, damit fehlende DLLs auffallen

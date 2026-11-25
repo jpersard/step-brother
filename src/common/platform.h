@@ -17,4 +17,9 @@ std::vector<std::string> utf8Args(int argc, wchar_t** argv);
 // Konsole auf UTF-8 umstellen (nur Windows, sonst ohne Wirkung).
 void enableUtf8Console();
 
+// Prozess sofort beenden, ohne DLL-Entladeroutinen und statische Destruktoren.
+// Ausgaben vorher selbst leeren. Unter Windows via TerminateProcess - ExitProcess (und
+// damit std::exit/_Exit) ruft die DLL-Entladeroutinen trotzdem auf.
+[[noreturn]] void hardExit(int code);
+
 }  // namespace sb

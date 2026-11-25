@@ -1,5 +1,7 @@
 #include "platform.h"
 
+#include <cstdlib>
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -20,8 +22,15 @@ std::vector<std::string> utf8Args(int argc, wchar_t** argv) {
 }
 
 void enableUtf8Console() { SetConsoleOutputCP(CP_UTF8); }
+
+void hardExit(int code) {
+  TerminateProcess(GetCurrentProcess(), static_cast<UINT>(code));
+  std::_Exit(code);  // nicht erreicht
+}
 #else
 void enableUtf8Console() {}
+
+void hardExit(int code) { std::_Exit(code); }
 #endif
 
 }  // namespace sb

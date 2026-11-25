@@ -633,7 +633,7 @@ int finish(int code) {
   std::cerr.flush();
   std::fflush(nullptr);
 #if defined(__MINGW32__)
-  std::_Exit(code);
+  sb::hardExit(code);
 #endif
   return code;
 }

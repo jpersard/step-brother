@@ -76,6 +76,7 @@ der parallelen Vernetzung) wartet beim Entladen der DLLs auf seine Threads, wäh
 Windows die Loader-Sperre hält. Mit MSVC und unter Linux tritt das nicht auf.
 
 `sb-bench` beendet sich unter MinGW deshalb nach dem Schreiben der Ergebnisse direkt
-mit `std::_Exit`. Für den Viewer in M1 ist das keine Lösung. Bleibt MinGW nach dem
+mit `TerminateProcess`. `std::_Exit` reicht nicht, weil es unter Windows `ExitProcess`
+aufruft und die DLL-Entladeroutinen damit trotzdem laufen. Für den Viewer in M1 ist das keine Lösung. Bleibt MinGW nach dem
 Compiler-Vergleich im Rennen, muss der Thread-Pool vor dem Programmende sauber
 heruntergefahren werden.

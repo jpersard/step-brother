@@ -99,7 +99,7 @@ jobs:
           New-Item -ItemType Directory -Force $dist | Out-Null
           Copy-Item build/${{ matrix.preset }}/bin/*.exe $dist
           Copy-Item build/${{ matrix.preset }}/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll $dist
-          Copy-Item THIRD_PARTY_LICENSES.txt, README.md $dist
+          Copy-Item LICENSE, THIRD_PARTY_LICENSES.txt, README.md $dist
           if ('${{ matrix.toolchain }}' -eq 'msvc') {
             # C++-Laufzeit beilegen, damit kein VC++-Redistributable installiert sein muss
             Get-ChildItem "$env:VCToolsRedistDir\x64\Microsoft.VC*.CRT\*.dll" | Copy-Item -Destination $dist

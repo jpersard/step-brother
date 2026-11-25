@@ -6,7 +6,7 @@ OpenGL-Renderer.
 
 **Stand: M0 – Fundament & Benchmark.** Es gibt noch keinen Viewer, sondern zwei
 Kommandozeilen-Werkzeuge, die klären, wie schnell und wie speicherhungrig das Lesen
-deiner echten Anlagen ist.
+deiner echten Anlagen ist. Wie es weitergeht, steht in der [Roadmap](docs/ROADMAP.md).
 
 | Programm | Zweck |
 | --- | --- |
@@ -94,6 +94,7 @@ Die Programme liegen in `build\windows-msvc\bin`. In VS Code mit der Erweiterung
 ## Projektaufbau
 
 ```
+docs/ROADMAP.md     Meilensteine bis Version 1.0
 src/sb-bench/       M0-Benchmark
 src/sb-gen-step/    Generator für synthetische Test-Anlagen
 cmake/triplets/     vcpkg-Triplet für clang-cl
@@ -102,6 +103,8 @@ cmake/toolchains/   zugehörige Toolchain
 ```
 
 ## Lizenzen
+
+Der Code von step Brother steht unter der [MIT-Lizenz](LICENSE).
 
 step Brother nutzt Open CASCADE Technology (LGPL 2.1 mit Open-CASCADE-Ausnahme),
 dynamisch gelinkt. Alle Lizenztexte stehen in

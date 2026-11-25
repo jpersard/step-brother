@@ -53,8 +53,12 @@ eigenen Datentypen.
   - Vernetzungszeit und Dreieckszahl bei mehreren Toleranzen
   - Ausdehnung der Anlage
 - [x] `sb-gen-step`: synthetische Test-Anlage mit Gleichteilen
+- [x] Erster Befund: OCCTs Transfer wächst quadratisch mit der Wiederverwendung
+      eines Teils, siehe [M0-Befunde](m0-befunde.md)
 - [ ] Benchmark mit echter Testanlage: alle drei Compiler, Healing an und aus,
       Transfer am Stück und je Wurzel
+- [ ] Entscheidung zum Transfer-Engpass: OCCT patchen, eigener Struktur-Leser oder
+      nichts tun
 
 **Abnahme:** Die Messwerte liegen vor, ein Compiler ist festgelegt, und die
 Speicherspitze beim Parsen ist bekannt.

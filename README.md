@@ -52,6 +52,7 @@ Wichtige Optionen (`sb-bench.exe --help` zeigt alle):
 | `--no-mesh` | Vernetzung auslassen (schneller, nur Lesen messen) |
 | `--deflection 0.01,0.003,0.001` | relative Vernetzungstoleranzen |
 | `--all-attributes` | auch Layer, Eigenschaften, GD&T, Material, Ansichten lesen |
+| `--no-names`, `--no-colors` | Namen bzw. Farben nicht lesen |
 
 **Datenschutz:** Die JSON-Datei enthält keine Datei-, Bauteil- oder Baugruppennamen,
 nur Zahlen (Zeiten, Speicher, Anzahlen, Ausdehnung). Sie kann gefahrlos geteilt
@@ -64,7 +65,9 @@ werden. STEP-Dateien gehören nie ins Repo – `.gitignore` schließt sie aus.
 - **Speicher je Phase:** aktueller Wert, Spitze seit Start und (Windows) zugesagter
   Speicher inkl. Auslagerung. Die Spitze nach `parse` ist die wichtigste Zahl.
 - **Struktur:** Wurzeln, Baugruppen, Prototypen (eindeutige Teile), Teile-Instanzen,
-  Wiederverwendungsfaktor, Flächen und Kanten.
+  Wiederverwendungsfaktor, Flächen und Kanten. `max_direct_reuse` zeigt, wie oft
+  dieselbe Definition höchstens direkt eingebaut ist – davon hängt die Transferzeit
+  quadratisch ab (siehe [M0-Befunde](docs/m0-befunde.md)).
 - **Vernetzung je Toleranz:** Zeit, Dreiecke der Prototypen und Dreiecke über alle
   Instanzen (das müsste die Grafikkarte ohne Culling zeichnen).
 - **Ausdehnung:** Größe der Anlage und größte Koordinate – entscheidet, wie viel
@@ -72,7 +75,7 @@ werden. STEP-Dateien gehören nie ins Repo – `.gitignore` schließt sie aus.
 
 ## Selbst bauen (optional)
 
-Voraussetzungen: Visual Studio 2022 Build Tools mit „Desktopentwicklung mit C++“
+Voraussetzungen: Visual Studio Build Tools (2022 oder 2026) mit „Desktopentwicklung mit C++“
 (für clang-cl zusätzlich „C++-Clang-Tools für Windows“), Git, und vcpkg:
 
 ```bat
@@ -81,7 +84,7 @@ C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 setx VCPKG_ROOT C:\vcpkg
 ```
 
-Dann in einer „x64 Native Tools Command Prompt for VS 2022“:
+Dann in einer „x64 Native Tools Command Prompt“ von Visual Studio:
 
 ```bat
 cmake --preset windows-msvc

@@ -35,8 +35,9 @@ jobs:
             toolchain: mingw
 
     env:
-      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/../vcpkg-bincache
+      # Absolute Pfade ausserhalb des Arbeitsordners (actions/cache erlaubt kein "..")
+      VCPKG_ROOT: D:\vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: D:\vcpkg-bincache
       VCPKG_DISABLE_METRICS: "1"
 
     steps:
@@ -47,6 +48,11 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: x64
+
+      - name: VCPKG_ROOT zuruecksetzen
+        # Die VS-Umgebung zeigt VCPKG_ROOT auf das vcpkg von Visual Studio - wir wollen unseres.
+        if: matrix.toolchain == 'msvc'
+        run: Add-Content $env:GITHUB_ENV "VCPKG_ROOT=D:\vcpkg"
 
       - name: MSYS2 / MinGW-w64 (UCRT64)
         if: matrix.toolchain == 'mingw'

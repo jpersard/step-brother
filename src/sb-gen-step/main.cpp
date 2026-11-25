@@ -7,6 +7,9 @@
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
+#include <Message.hxx>
+#include <Message_Messenger.hxx>
+#include <Message_Printer.hxx>
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Writer.hxx>
 #include <STEPControl_StepModelType.hxx>
@@ -15,7 +18,7 @@
 #include <TDocStd_Document.hxx>
 #include <TopLoc_Location.hxx>
 #include <TopoDS_Shape.hxx>
-#include <TopTools_ListOfShape.hxx>
+#include <NCollection_List.hxx>
 #include <XCAFApp_Application.hxx>
 #include <XCAFDoc_ColorTool.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
@@ -36,7 +39,7 @@ namespace {
 // Platte 400 x 300 x 20 mm mit holes x holes Bohrungen.
 TopoDS_Shape makePlate(int holes) {
   TopoDS_Shape plate = BRepPrimAPI_MakeBox(400.0, 300.0, 20.0).Shape();
-  TopTools_ListOfShape tools;
+  NCollection_List<TopoDS_Shape> tools;
   for (int i = 0; i < holes; ++i) {
     for (int k = 0; k < holes; ++k) {
       const double x = 400.0 * (i + 0.5) / holes;
@@ -44,7 +47,7 @@ TopoDS_Shape makePlate(int holes) {
       tools.Append(BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(x, y, -1.0), gp::DZ()), 6.0, 22.0).Shape());
     }
   }
-  TopTools_ListOfShape args;
+  NCollection_List<TopoDS_Shape> args;
   args.Append(plate);
   BRepAlgoAPI_Cut cut;
   cut.SetArguments(args);
@@ -82,6 +85,11 @@ int run(const std::vector<std::string>& args) {
                  "  --holes N    N x N Bohrungen je Platte (Standard 4)\n"
                  "  --offset mm  ganze Anlage vom Ursprung wegschieben (Float-Genauigkeit testen)\n";
     return 2;
+  }
+
+  // OCCT-Statistikausgaben unterdruecken
+  for (const occ::handle<Message_Printer>& printer : Message::DefaultMessenger()->Printers()) {
+    printer->SetTraceLevel(Message_Fail);
   }
 
   occ::handle<TDocStd_Document> doc;
@@ -156,7 +164,7 @@ int wmain(int argc, wchar_t** argv) {
   try {
     return run(args);
   } catch (const Standard_Failure& e) {
-    std::cerr << "OCCT-Fehler: " << e.GetMessageString() << "\n";
+    std::cerr << "OCCT-Fehler: " << e.what() << "\n";
     return 1;
   }
 }
@@ -165,7 +173,7 @@ int main(int argc, char** argv) {
   try {
     return run(std::vector<std::string>(argv, argv + argc));
   } catch (const Standard_Failure& e) {
-    std::cerr << "OCCT-Fehler: " << e.GetMessageString() << "\n";
+    std::cerr << "OCCT-Fehler: " << e.what() << "\n";
     return 1;
   }
 }

@@ -32,7 +32,8 @@
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
-#include <TopTools_IndexedMapOfShape.hxx>
+#include <NCollection_IndexedMap.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <XCAFApp_Application.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
@@ -73,6 +74,8 @@ struct Options {
   Healing healing = Healing::Default;
   bool perRoot = false;        // TransferOneRoot je Wurzel statt Transfer()
   bool allAttributes = false;  // auch Layer, Eigenschaften, GD&T, Material, Ansichten lesen
+  bool names = true;
+  bool colors = true;
   bool mesh = true;
   bool meshParallelFaces = false;  // Parallelitaet innerhalb eines Teils statt ueber Teile
   std::vector<double> deflections{0.01, 0.003, 0.001};  // relativ zur Teilgroesse
@@ -90,6 +93,8 @@ Optionen:
   --healing <modus>       default | off | no-shell-orient   (Standard: default)
   --per-root              Wurzeln einzeln mit TransferOneRoot uebertragen
   --all-attributes        auch Layer, Eigenschaften, GD&T, Material, Ansichten lesen
+  --no-names              keine Namen lesen
+  --no-colors             keine Farben lesen
   --no-mesh               Vernetzung auslassen
   --deflection <liste>    relative Vernetzungstoleranzen, z. B. 0.01,0.003,0.001
   --angular <rad>         Winkeltoleranz der Vernetzung (Standard 0.5)
@@ -132,6 +137,10 @@ std::optional<Options> parseArgs(const std::vector<std::string>& args) {
       opt.perRoot = true;
     } else if (a == "--all-attributes") {
       opt.allAttributes = true;
+    } else if (a == "--no-names") {
+      opt.names = false;
+    } else if (a == "--no-colors") {
+      opt.colors = false;
     } else if (a == "--no-mesh") {
       opt.mesh = false;
     } else if (a == "--deflection") {
@@ -208,6 +217,10 @@ struct Structure {
   std::uint64_t components = 0;   // Einbau-Referenzen in Baugruppen-Definitionen
   std::uint64_t partInstances = 0;  // Teile-Vorkommen in der aufgeloesten Anlage
   int maxDepth = 0;
+  // Groesste Zahl direkter Einbau-Referenzen auf dieselbe Definition. OCCTs Transfer
+  // (STEPControl_ActorRead fuer NAUO) waechst damit quadratisch - siehe docs/m0-befunde.md.
+  std::uint64_t maxDirectReuse = 0;
+  std::uint64_t maxOccurrences = 0;  // haeufigstes Teil in der aufgeloesten Anlage
   std::uint64_t prototypeFaces = 0;
   std::uint64_t prototypeEdges = 0;
   std::uint64_t instancedFaces = 0;  // Flaechen, wenn jede Instanz einzeln gespeichert waere
@@ -269,6 +282,10 @@ Structure analyze(const occ::handle<XCAFDoc_ShapeTool>& shapeTool) {
     return n;
   };
 
+  for (const auto& entry : parents) {
+    s.maxDirectReuse = std::max<std::uint64_t>(s.maxDirectReuse, entry.second.size());
+  }
+
   for (const TDF_Label& label : top) {
     const std::uint64_t n = occurrences(label.Tag());
     s.maxDepth = std::max(s.maxDepth, depth[label.Tag()]);
@@ -276,11 +293,12 @@ Structure analyze(const occ::handle<XCAFDoc_ShapeTool>& shapeTool) {
 
     ++s.prototypes;
     s.partInstances += n;
+    s.maxOccurrences = std::max(s.maxOccurrences, n);
     s.prototypeLabels.push_back(label);
     s.prototypeOccurrences.push_back(n);
 
     const TopoDS_Shape shape = XCAFDoc_ShapeTool::GetShape(label);
-    TopTools_IndexedMapOfShape faces, edges;
+    NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> faces, edges;
     TopExp::MapShapes(shape, TopAbs_FACE, faces);
     TopExp::MapShapes(shape, TopAbs_EDGE, edges);
     s.prototypeFaces += static_cast<std::uint64_t>(faces.Extent());
@@ -333,7 +351,7 @@ MeshResult meshAll(const Structure& s, double deflection, const Options& opt) {
   r.seconds = secondsSince(start);
 
   for (std::size_t i = 0; i < n; ++i) {
-    TopTools_IndexedMapOfShape faces;
+    NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> faces;
     TopExp::MapShapes(shapes[i], TopAbs_FACE, faces);
     std::uint64_t tris = 0;
     for (int f = 1; f <= faces.Extent(); ++f) {
@@ -414,8 +432,8 @@ int run(const std::vector<std::string>& args) {
     // Reader in eigenem Block: Nach dem Block ist das STEP-Entitaetenmodell freigegeben.
     {
       auto reader = std::make_unique<STEPCAFControl_Reader>();
-      reader->SetColorMode(true);
-      reader->SetNameMode(true);
+      reader->SetColorMode(opt.colors);
+      reader->SetNameMode(opt.names);
       reader->SetLayerMode(opt.allAttributes);
       reader->SetPropsMode(opt.allAttributes);
       reader->SetMetaMode(opt.allAttributes);
@@ -477,7 +495,7 @@ int run(const std::vector<std::string>& args) {
         std::to_string(structure.assemblies) + " Baugruppen");
   } catch (const Standard_Failure& e) {
     ok = false;
-    error = std::string("OCCT: ") + e.GetMessageString();
+    error = std::string("OCCT: ") + e.what();
   } catch (const std::exception& e) {
     ok = false;
     error = e.what();
@@ -495,7 +513,7 @@ int run(const std::vector<std::string>& args) {
             " Dreiecke (Prototypen), " + std::to_string(m.instancedTriangles) +
             " Dreiecke (alle Instanzen)");
       } catch (const Standard_Failure& e) {
-        log(std::string("  Fehler: ") + e.GetMessageString());
+        log(std::string("  Fehler: ") + e.what());
       }
     }
   }
@@ -529,6 +547,8 @@ int run(const std::vector<std::string>& args) {
   j.value("healing", healingName(opt.healing));
   j.value("per_root", opt.perRoot);
   j.value("all_attributes", opt.allAttributes);
+  j.value("names", opt.names);
+  j.value("colors", opt.colors);
   j.value("mesh_parallel", opt.meshParallelFaces ? "faces" : "prototypes");
   j.value("angular_deflection", opt.angularDeflection);
   j.endObject();
@@ -560,6 +580,8 @@ int run(const std::vector<std::string>& args) {
   j.value("components", structure.components);
   j.value("part_instances", structure.partInstances);
   j.value("max_depth", structure.maxDepth);
+  j.value("max_direct_reuse", structure.maxDirectReuse);
+  j.value("max_part_occurrences", structure.maxOccurrences);
   j.value("prototype_faces", structure.prototypeFaces);
   j.value("prototype_edges", structure.prototypeEdges);
   j.value("instanced_faces", structure.instancedFaces);

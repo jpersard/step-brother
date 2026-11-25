@@ -6,6 +6,9 @@ find_program(SB_CLANG_CL clang-cl
   REQUIRED)
 set(CMAKE_C_COMPILER "${SB_CLANG_CL}" CACHE FILEPATH "")
 set(CMAKE_CXX_COMPILER "${SB_CLANG_CL}" CACHE FILEPATH "")
+# Ressourcen (.rc) mit dem rc.exe des Windows SDK uebersetzen - sonst nimmt CMake clang-cl.
+find_program(SB_RC rc HINTS "$ENV{WindowsSdkVerBinPath}/x64" REQUIRED)
+set(CMAKE_RC_COMPILER "${SB_RC}" CACHE FILEPATH "")
 
 # vcpkg uebergibt sein Wurzelverzeichnis je nach Funktion als _VCPKG_ROOT_DIR
 # (vcpkg_cmake_configure) oder Z_VCPKG_ROOT_DIR; die Umgebungsvariable ist Rueckfall.

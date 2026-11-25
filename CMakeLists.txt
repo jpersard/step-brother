@@ -19,6 +19,10 @@ if(MSVC)
 else()
   add_compile_options(-Wall -Wextra)
 endif()
+if(WIN32)
+  # OCCT-Header nutzen M_PI; ohne GNU-Erweiterungen (MinGW, -std=c++17) braucht es diese Definition.
+  add_compile_definitions(_USE_MATH_DEFINES)
+endif()
 
 # Open CASCADE wird dynamisch gelinkt (LGPL 2.1).
 find_package(OpenCASCADE CONFIG REQUIRED)

@@ -6,3 +6,5 @@ set(VCPKG_LIBRARY_LINKAGE dynamic)
 set(VCPKG_BUILD_TYPE release)
 set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/../toolchains/clang-cl.cmake")
 set(VCPKG_ENV_PASSTHROUGH VCPKG_ROOT)
+# Mit eigener Toolchain laedt vcpkg die VS-Umgebung (vcvars) sonst nicht - die braucht z. B. der opengl-Port.
+set(VCPKG_LOAD_VCVARS_ENV ON)

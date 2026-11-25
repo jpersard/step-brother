@@ -5,9 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Laufende Builds nicht abbrechen: Der erste Lauf baut OCCT ueber eine Stunde lang und
+# fuellt dabei den Cache. Neue Pushes warten, bis er fertig ist.
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -88,6 +90,16 @@ jobs:
 
       - name: Konfigurieren (baut beim ersten Mal OCCT, ca. 1-2 h)
         run: cmake --preset ${{ matrix.preset }}
+
+      - name: vcpkg-Logs bei Fehler ausgeben
+        if: failure()
+        run: |
+          Get-ChildItem "$env:VCPKG_ROOT\buildtrees" -Recurse -Include *.log -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match 'err|out|detect|config' } |
+            Sort-Object LastWriteTime | Select-Object -Last 8 | ForEach-Object {
+              Write-Host "===== $($_.FullName)"
+              Get-Content $_.FullName -Tail 60
+            }
 
       - name: vcpkg-Cache speichern
         if: always() && steps.cache.outputs.cache-hit != 'true'

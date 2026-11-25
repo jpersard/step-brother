@@ -6,6 +6,7 @@ add_executable(sb-bench
   json.h)
 
 target_link_libraries(sb-bench PRIVATE
+  sb-common
   TKernel TKMath TKBRep TKG3d TKTopAlgo TKMesh
   TKLCAF TKXCAF TKXSBase TKDESTEP)
 

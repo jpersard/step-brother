@@ -2,6 +2,7 @@
 add_executable(sb-gen-step main.cpp)
 
 target_link_libraries(sb-gen-step PRIVATE
+  sb-common
   TKernel TKMath TKBRep TKG3d TKTopAlgo TKPrim TKBO
   TKLCAF TKXCAF TKXSBase TKDESTEP)
 

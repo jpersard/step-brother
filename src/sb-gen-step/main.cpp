@@ -4,6 +4,8 @@
 // Prototypen (Lochplatte, Stuetze, Rohr), die mehrfach eingebaut werden. Damit testet
 // die Datei genau das, worauf step Brother setzt: Gleichteile ueber die STEP-Produktstruktur.
 
+#include "platform.h"
+
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
@@ -30,9 +32,6 @@
 #include <string>
 #include <vector>
 
-#if defined(_WIN32)
-#include <windows.h>
-#endif
 
 namespace {
 
@@ -154,15 +153,8 @@ int run(const std::vector<std::string>& args) {
 
 #if defined(_WIN32)
 int wmain(int argc, wchar_t** argv) {
-  std::vector<std::string> args;
-  for (int i = 0; i < argc; ++i) {
-    const int len = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, nullptr, 0, nullptr, nullptr);
-    std::string s(static_cast<std::size_t>(len > 0 ? len - 1 : 0), '\0');
-    if (len > 1) WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, s.data(), len, nullptr, nullptr);
-    args.push_back(s);
-  }
   try {
-    return run(args);
+    return run(sb::utf8Args(argc, argv));
   } catch (const Standard_Failure& e) {
     std::cerr << "OCCT-Fehler: " << e.what() << "\n";
     return 1;

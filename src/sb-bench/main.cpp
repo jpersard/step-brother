@@ -11,6 +11,7 @@
 
 #include "json.h"
 #include "memory.h"
+#include "platform.h"
 
 #include <BRepBndLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
@@ -55,9 +56,6 @@
 #include <unordered_map>
 #include <vector>
 
-#if defined(_WIN32)
-#include <windows.h>
-#endif
 
 namespace fs = std::filesystem;
 
@@ -381,15 +379,6 @@ void quietOcctMessages() {
   }
 }
 
-#if defined(_WIN32)
-std::string toUtf8(const wchar_t* w) {
-  const int len = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
-  std::string s(static_cast<std::size_t>(len > 0 ? len - 1 : 0), '\0');
-  if (len > 1) WideCharToMultiByte(CP_UTF8, 0, w, -1, s.data(), len, nullptr, nullptr);
-  return s;
-}
-#endif
-
 int run(const std::vector<std::string>& args) {
   std::optional<Options> parsed;
   try {
@@ -637,10 +626,8 @@ int run(const std::vector<std::string>& args) {
 
 #if defined(_WIN32)
 int wmain(int argc, wchar_t** argv) {
-  SetConsoleOutputCP(CP_UTF8);
-  std::vector<std::string> args;
-  for (int i = 0; i < argc; ++i) args.push_back(toUtf8(argv[i]));
-  return run(args);
+  sb::enableUtf8Console();
+  return run(sb::utf8Args(argc, argv));
 }
 #else
 int main(int argc, char** argv) {

@@ -27,5 +27,6 @@ if(OpenCASCADE_VERSION VERSION_LESS 8.0)
   message(FATAL_ERROR "step Brother braucht Open CASCADE 8.0 oder neuer")
 endif()
 
+add_subdirectory(src/common)
 add_subdirectory(src/sb-bench)
 add_subdirectory(src/sb-gen-step)

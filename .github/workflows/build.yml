@@ -1,0 +1,132 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows ${{ matrix.name }}
+    runs-on: windows-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: MSVC
+            preset: windows-msvc
+            triplet: x64-windows-release
+            toolchain: msvc
+          - name: clang-cl
+            preset: windows-clang-cl
+            triplet: x64-windows-clangcl-release
+            toolchain: msvc
+          - name: MinGW
+            preset: windows-mingw
+            triplet: x64-mingw-dynamic-release
+            toolchain: mingw
+
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/../vcpkg-bincache
+      VCPKG_DISABLE_METRICS: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: MSVC-Umgebung
+        if: matrix.toolchain == 'msvc'
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      - name: MSYS2 / MinGW-w64 (UCRT64)
+        if: matrix.toolchain == 'mingw'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: mingw-w64-ucrt-x86_64-gcc
+
+      - name: MinGW in PATH
+        if: matrix.toolchain == 'mingw'
+        run: |
+          $bin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'ucrt64\bin'
+          Add-Content $env:GITHUB_PATH $bin
+          & (Join-Path $bin 'g++.exe') --version
+
+      - name: vcpkg holen (Commit aus vcpkg.json)
+        run: |
+          $baseline = (Get-Content vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+          git clone --quiet https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
+          git -C "$env:VCPKG_ROOT" checkout --quiet $baseline
+          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
+
+      - name: vcpkg-Cache wiederherstellen
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json', 'cmake/triplets/**', 'cmake/toolchains/**') }}
+          restore-keys: vcpkg-${{ matrix.triplet }}-
+
+      - name: Konfigurieren (baut beim ersten Mal OCCT, ca. 1-2 h)
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: vcpkg-Cache speichern
+        if: always() && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json', 'cmake/triplets/**', 'cmake/toolchains/**') }}
+
+      - name: Bauen
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Portablen Ordner zusammenstellen
+        run: |
+          $dist = "dist/step-brother-m0-${{ matrix.preset }}"
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          Copy-Item build/${{ matrix.preset }}/bin/*.exe $dist
+          Copy-Item build/${{ matrix.preset }}/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll $dist
+          Copy-Item THIRD_PARTY_LICENSES.txt, README.md $dist
+          if ('${{ matrix.toolchain }}' -eq 'msvc') {
+            # C++-Laufzeit beilegen, damit kein VC++-Redistributable installiert sein muss
+            Get-ChildItem "$env:VCToolsRedistDir\x64\Microsoft.VC*.CRT\*.dll" | Copy-Item -Destination $dist
+          } else {
+            $bin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'ucrt64\bin'
+            foreach ($dll in 'libstdc++-6.dll', 'libgcc_s_seh-1.dll', 'libwinpthread-1.dll') {
+              Copy-Item (Join-Path $bin $dll) $dist
+            }
+          }
+          Get-ChildItem $dist | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: Rauchtest mit synthetischer Anlage
+        run: |
+          $dist = "dist/step-brother-m0-${{ matrix.preset }}"
+          # Ohne MSYS2/VS im PATH testen, damit fehlende DLLs auffallen
+          $env:PATH = "$((Resolve-Path $dist).Path);C:\Windows\System32;C:\Windows"
+          & "$dist/sb-gen-step.exe" test.stp --grid 5 --holes 3
+          if ($LASTEXITCODE -ne 0) { throw "sb-gen-step fehlgeschlagen" }
+          & "$dist/sb-bench.exe" test.stp --json bench.json
+          if ($LASTEXITCODE -ne 0) { throw "sb-bench fehlgeschlagen" }
+          $r = Get-Content bench.json | ConvertFrom-Json
+          if ($r.structure.prototypes -ne 3) { throw "Erwartet 3 Prototypen, gefunden $($r.structure.prototypes)" }
+          if ($r.structure.part_instances -ne 175) { throw "Erwartet 175 Instanzen, gefunden $($r.structure.part_instances)" }
+          Get-Content bench.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: step-brother-m0-${{ matrix.preset }}
+          path: dist/step-brother-m0-${{ matrix.preset }}
+          retention-days: 30

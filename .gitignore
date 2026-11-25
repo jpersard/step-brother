@@ -1,0 +1,21 @@
+# Build-Ausgaben
+/build/
+/out/
+/vcpkg_installed/
+/.vs/
+/.vscode/*
+!/.vscode/extensions.json
+CMakeUserPresets.json
+
+# Testdaten bleiben lokal - niemals STEP-Dateien oder Caches ins (oeffentliche) Repo
+*.stp
+*.step
+*.STP
+*.STEP
+*.p21
+*.stpz
+*.sbc
+
+# Benchmark-Ergebnisse koennen Datei- und Bauteilnamen enthalten
+/results/
+*.bench.json

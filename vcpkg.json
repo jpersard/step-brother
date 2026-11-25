@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "step-brother",
+  "version-string": "0.0.1",
+  "description": "step Brother - schneller STEP-Viewer fuer grosse Anlagen",
+  "builtin-baseline": "1911fa2a6e1ccaf8eda36b4057ad9fc68e781e93",
+  "dependencies": [
+    {
+      "name": "opencascade",
+      "default-features": false
+    }
+  ]
+}

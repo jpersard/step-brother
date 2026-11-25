@@ -624,13 +624,27 @@ int run(const std::vector<std::string>& args) {
 
 }  // namespace
 
+// Unter MinGW haengt der Prozess nach getaner Arbeit beim Beenden: OCCTs Thread-Pool
+// (parallele Vernetzung) wartet beim Entladen der DLLs auf seine Threads, waehrend Windows
+// die Loader-Sperre haelt. Daher dort nach dem Rausschreiben sofort beenden.
+// Siehe docs/m0-befunde.md, Abschnitt 4.
+int finish(int code) {
+  std::cout.flush();
+  std::cerr.flush();
+  std::fflush(nullptr);
+#if defined(__MINGW32__)
+  std::_Exit(code);
+#endif
+  return code;
+}
+
 #if defined(_WIN32)
 int wmain(int argc, wchar_t** argv) {
   sb::enableUtf8Console();
-  return run(sb::utf8Args(argc, argv));
+  return finish(run(sb::utf8Args(argc, argv)));
 }
 #else
 int main(int argc, char** argv) {
-  return run(std::vector<std::string>(argv, argv + argc));
+  return finish(run(std::vector<std::string>(argv, argv + argc)));
 }
 #endif

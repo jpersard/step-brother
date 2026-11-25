@@ -67,3 +67,15 @@ In OCCT 8.0.1 gibt es keinen Schalter, der das Parsen oder den Transfer einer
 einzelnen Datei parallelisiert. OCCT stellt nur sicher, dass mehrere Reader in
 eigenen Threads gleichzeitig laufen können. Parallel arbeitet nur die Vernetzung:
 `sb-bench` vernetzt die Prototypen parallel.
+
+## 4. MinGW: Prozess hängt beim Beenden
+
+Mit MinGW-w64 erledigt `sb-bench` die gesamte Arbeit, der Prozess beendet sich danach
+aber nicht. Wahrscheinliche Ursache: OCCTs Thread-Pool (`OSD_ThreadPool`, genutzt von
+der parallelen Vernetzung) wartet beim Entladen der DLLs auf seine Threads, während
+Windows die Loader-Sperre hält. Mit MSVC und unter Linux tritt das nicht auf.
+
+`sb-bench` beendet sich unter MinGW deshalb nach dem Schreiben der Ergebnisse direkt
+mit `std::_Exit`. Für den Viewer in M1 ist das keine Lösung. Bleibt MinGW nach dem
+Compiler-Vergleich im Rennen, muss der Thread-Pool vor dem Programmende sauber
+heruntergefahren werden.

@@ -44,7 +44,7 @@
       "inherits": "windows-base",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-windows-clangcl-release",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang-cl.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang-cl-project.cmake"
       }
     },
     {

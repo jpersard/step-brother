@@ -24,3 +24,7 @@ endif()
 # Auch in try_compile-Projekten verfuegbar machen
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES _VCPKG_ROOT_DIR Z_VCPKG_ROOT_DIR SB_VCPKG_ROOT)
 include("${SB_VCPKG_ROOT}/scripts/toolchains/windows.cmake")
+# vcpkg setzt CMAKE_RC_FLAGS "/c65001 /DWIN32". Mit Ninja schickt CMake diese Flags zur
+# Abhaengigkeitsermittlung auch an clang-cl, das /c65001 als Dateinamen missversteht.
+# OCCTs .rc-Dateien sind reines ASCII, die Codepage-Angabe ist entbehrlich.
+set(CMAKE_RC_FLAGS "/DWIN32" CACHE STRING "" FORCE)

@@ -25,6 +25,36 @@ OCCT 8.0.1 und GCC 13 unter Linux auf 4 Kernen.
   Wird geprüft mit `--healing off`.
 - **Wenig Gleichteile:** Instancing spart hier nur den Faktor 3. Der Renderer muss also
   auch mit vielen verschiedenen Teilen schnell sein.
+### Healing aus und Vernetzung
+
+| Lauf | Parsen | Transfer | Gesamt |
+| --- | ---: | ---: | ---: |
+| Healing an (`default`), Lauf 1 | 37 s | 385 s | 433 s |
+| Healing an (`default`), Lauf 2 | 35 s | 494 s | 534 s ohne Netz |
+| **Healing aus (`off`)** | 66 s | **35 s** | 106 s |
+
+Healing kostet 90 % der Transferzeit. Ohne Healing ändert sich die Struktur kaum
+(192.937 statt 192.973 Flächen, 505.940 statt 510.667 Kanten). Die Parse-Zeit schwankt
+bei gleichen Einstellungen zwischen 35 und 66 s, vermutlich durch den Datei-Cache von
+Windows oder den Virenscanner. Vergleiche brauchen daher mehrere Läufe.
+
+Vernetzung (mit Healing, parallel über Prototypen, 20 Threads):
+
+| Relative Toleranz | Zeit | Dreiecke Prototypen | Dreiecke alle Instanzen | Flächen ohne Netz |
+| ---: | ---: | ---: | ---: | ---: |
+| 0,01 | 51 s | 5,5 Mio. | 9,8 Mio. | 98 |
+| 0,003 | 58 s | 8,8 Mio. | 15,7 Mio. | 98 |
+| 0,001 | 81 s | 18,3 Mio. | 33,1 Mio. | 142 |
+
+**Vorläufige Folgerungen:**
+
+- Healing im Importer standardmäßig aus. Ob die Netzqualität ohne Healing reicht, zeigt
+  die Zahl der Flächen ohne Netz. Reicht sie nicht, werden nur die fehlerhaften
+  Prototypen gezielt nachgeheilt.
+- Erstimport geschätzt 2–2,5 min statt 12 min.
+- 10–16 Mio. Dreiecke für die ganze Anlage sind für den Renderer machbar. Kandidaten
+  für die LOD-Stufen: 0,003 (volle Qualität) und 0,01 (beim Drehen).
+
 - **Unbegrenzte Elemente:** Die Datei enthält mindestens ein Element ohne endliche
   Ausdehnung (Bounding Box 2e100 in Z). Wahrscheinlich ist das eine Konstruktionsachse oder eine
   Fläche ohne Randkanten. `sb-bench` zählt solche Elemente jetzt (`unbounded_pieces`)

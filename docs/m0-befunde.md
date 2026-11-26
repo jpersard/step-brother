@@ -61,6 +61,30 @@ Vernetzung (mit Healing, parallel über Prototypen, 20 Threads):
 - 10–16 Mio. Dreiecke für die ganze Anlage sind für den Renderer machbar. Kandidaten
   für die LOD-Stufen: 0,003 (volle Qualität) und 0,01 (beim Drehen).
 
+### Compiler-Vergleich (Healing aus, nur Lesen, 20 Threads)
+
+| Variante | Lauf | Parsen | Transfer | Gesamt |
+| --- | --- | ---: | ---: | ---: |
+| MSVC 19.52 | 2 | 36,5 s | 15,5 s | 57 s |
+| clang-cl 22.1 | 1 | 45,8 s | 21,1 s | 73 s |
+| clang-cl 22.1 | 2 | 35,3 s | 16,5 s | 57 s |
+| MinGW GCC 16.2 | 1 | 31,1 s | 14,2 s | 50 s |
+| MinGW GCC 16.2 | 2 | 32,0 s | 16,1 s | 53 s |
+
+Die Unterschiede liegen bei rund 10 % und damit nahe am Messrauschen. Der früher
+berichtete Faktor 2–3 zugunsten von GCC (OCCT-Issue 32014) tritt mit OCCT 8 nicht auf.
+**Empfehlung: MSVC.** MinGW wäre beim Parsen etwas schneller, bringt aber den Hänger
+beim Programmende (Abschnitt 4), zusätzliche Laufzeit-DLLs und einen aufwendigeren
+Build mit. clang-cl bietet keinen messbaren Vorteil.
+
+### Offener Punkt: unbegrenzte Elemente ohne Healing
+
+Ohne Healing zählt `sb-bench` 155.506 Flächen und Kanten ohne endliche Ausdehnung.
+Vermutung: Vielen Flächen fehlen die 2D-Randkurven (pcurves), die das Healing sonst
+ergänzt. Ob die Vernetzung darunter leidet, zeigt die Messung mit Healing aus und
+Vernetzung (`faces_without_mesh`). Falls ja, braucht der Importer ein gezieltes,
+schnelles Teil-Healing statt des vollen `FixShape`.
+
 ## 1. Transfer wächst quadratisch mit der Wiederverwendung eines Teils
 
 **Beobachtung:** Ein Modul (eine Baugruppe aus 7 Teilen) wird N-mal in eine Anlage

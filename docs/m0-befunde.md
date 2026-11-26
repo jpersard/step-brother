@@ -25,6 +25,12 @@ OCCT 8.0.1 und GCC 13 unter Linux auf 4 Kernen.
   Wird geprüft mit `--healing off`.
 - **Wenig Gleichteile:** Instancing spart hier nur den Faktor 3. Der Renderer muss also
   auch mit vielen verschiedenen Teilen schnell sein.
+- **Unbegrenzte Elemente:** Die Datei enthält mindestens ein Element ohne endliche
+  Ausdehnung (Bounding Box 2e100 in Z). Wahrscheinlich ist das eine Konstruktionsachse oder eine
+  Fläche ohne Randkanten. `sb-bench` zählt solche Elemente jetzt (`unbounded_pieces`)
+  und lässt sie bei der Ausdehnung weg. Der Importer muss sie später ebenfalls
+  aussortieren.
+
 ### Healing aus und Vernetzung
 
 | Lauf | Parsen | Transfer | Gesamt |
@@ -54,12 +60,6 @@ Vernetzung (mit Healing, parallel über Prototypen, 20 Threads):
 - Erstimport geschätzt 2–2,5 min statt 12 min.
 - 10–16 Mio. Dreiecke für die ganze Anlage sind für den Renderer machbar. Kandidaten
   für die LOD-Stufen: 0,003 (volle Qualität) und 0,01 (beim Drehen).
-
-- **Unbegrenzte Elemente:** Die Datei enthält mindestens ein Element ohne endliche
-  Ausdehnung (Bounding Box 2e100 in Z). Wahrscheinlich ist das eine Konstruktionsachse oder eine
-  Fläche ohne Randkanten. `sb-bench` zählt solche Elemente jetzt (`unbounded_pieces`)
-  und lässt sie bei der Ausdehnung weg. Der Importer muss sie später ebenfalls
-  aussortieren.
 
 ## 1. Transfer wächst quadratisch mit der Wiederverwendung eines Teils
 

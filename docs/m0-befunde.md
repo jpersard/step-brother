@@ -1,8 +1,35 @@
 # M0-Befunde
 
-Erkenntnisse aus dem Benchmark. Die Messwerte stammen aus synthetischen Dateien
-(`sb-gen-step`), gemessen mit OCCT 8.0.1 und GCC 13 unter Linux auf 4 Kernen. Die
-Messung mit einer echten Anlage steht noch aus.
+Erkenntnisse aus dem Benchmark. Abschnitt 0 ist eine echte Anlage auf dem Ziel-PC,
+die übrigen Abschnitte stammen aus synthetischen Dateien (`sb-gen-step`), gemessen mit
+OCCT 8.0.1 und GCC 13 unter Linux auf 4 Kernen.
+
+## 0. Erste echte Anlage (509 MB, MSVC, 20 Threads, ohne Vernetzung)
+
+| Messwert | Ergebnis |
+| --- | --- |
+| Parsen | 37 s (13,8 MB/s), RAM-Spitze 3,2 GB |
+| Transfer | **385 s**, RAM-Spitze 3,4 GB |
+| Nach Freigabe des Readers | 1,65 GB |
+| Struktur | 1 Wurzel, 1.565 Baugruppen, 2.813 Prototypen, 8.447 Instanzen, Tiefe 12 |
+| Wiederverwendung | Faktor 3,0; `max_direct_reuse` 82 |
+| Flächen / Kanten (Prototypen) | 193.000 / 511.000 |
+
+**Folgerungen:**
+
+- **Speicher ist unkritisch:** 3,5 GB Spitze bei 36 GB RAM. Transfer je Wurzel oder
+  zusätzliche Sparmaßnahmen sind für diese Anlage nicht nötig.
+- **Der Transfer ist der Engpass** (89 % der Zeit), aber nicht wegen des quadratischen
+  NAUO-Problems (Abschnitt 1): Bei 82 direkten Einbauten spielt es keine Rolle. Die Zeit
+  steckt in der Umwandlung der Geometrie, vermutlich zu großen Teilen im Shape-Healing.
+  Wird geprüft mit `--healing off`.
+- **Wenig Gleichteile:** Instancing spart hier nur den Faktor 3. Der Renderer muss also
+  auch mit vielen verschiedenen Teilen schnell sein.
+- **Unbegrenzte Elemente:** Die Datei enthält mindestens ein Element ohne endliche
+  Ausdehnung (Bounding Box 2e100 in Z). Wahrscheinlich ist das eine Konstruktionsachse oder eine
+  Fläche ohne Randkanten. `sb-bench` zählt solche Elemente jetzt (`unbounded_pieces`)
+  und lässt sie bei der Ausdehnung weg. Der Importer muss sie später ebenfalls
+  aussortieren.
 
 ## 1. Transfer wächst quadratisch mit der Wiederverwendung eines Teils
 

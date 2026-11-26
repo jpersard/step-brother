@@ -31,6 +31,7 @@
 #include <TDF_Label.hxx>
 #include <TDocStd_Document.hxx>
 #include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <NCollection_IndexedMap.hxx>
@@ -492,6 +493,7 @@ int run(const std::vector<std::string>& args) {
 
   std::vector<MeshResult> meshes;
   Bnd_Box bbox;
+  std::uint64_t unboundedPieces = 0;  // Flaechen/Kanten ohne endliche Ausdehnung
   if (ok && opt.mesh) {
     for (double d : opt.deflections) {
       log("Phase 5/5: Vernetzen, Toleranz " + std::to_string(d) + " ...");
@@ -508,11 +510,31 @@ int run(const std::vector<std::string>& args) {
   }
   if (ok) {
     // Ausdehnung der Anlage - wichtig fuer die Float-Genauigkeit im Renderer.
+    // Je Flaeche (und freie Kante) einzeln, damit unbegrenzte Elemente (z. B. ein Zylinder
+    // ohne Randkanten oder eine Konstruktionsachse) gezaehlt statt mitgerechnet werden.
     try {
       NCollection_Sequence<TDF_Label> freeLabels;
       XCAFDoc_DocumentTool::ShapeTool(doc->Main())->GetFreeShapes(freeLabels);
+      auto addPiece = [&](const TopoDS_Shape& piece) {
+        Bnd_Box b;
+        BRepBndLib::Add(piece, b, /*useTriangulation=*/true);
+        if (b.IsVoid()) return;
+        double a0, b0, c0, a1, b1, c1;
+        b.Get(a0, b0, c0, a1, b1, c1);
+        const double limit = 1.0e12;  // weit jenseits jeder realen Anlage in mm
+        if (b.IsOpen() || std::max({std::abs(a0), std::abs(b0), std::abs(c0), std::abs(a1),
+                                    std::abs(b1), std::abs(c1)}) > limit) {
+          ++unboundedPieces;
+          return;
+        }
+        bbox.Add(b);
+      };
       for (const TDF_Label& label : freeLabels) {
-        BRepBndLib::Add(XCAFDoc_ShapeTool::GetShape(label), bbox, /*useTriangulation=*/true);
+        const TopoDS_Shape shape = XCAFDoc_ShapeTool::GetShape(label);
+        for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) addPiece(ex.Current());
+        for (TopExp_Explorer ex(shape, TopAbs_EDGE, TopAbs_FACE); ex.More(); ex.Next()) {
+          addPiece(ex.Current());
+        }
       }
     } catch (const Standard_Failure&) {
     }
@@ -604,6 +626,7 @@ int run(const std::vector<std::string>& args) {
     j.value("max_abs_coordinate",
             std::max({std::abs(x0), std::abs(y0), std::abs(z0), std::abs(x1), std::abs(y1),
                       std::abs(z1)}));
+    j.value("unbounded_pieces", unboundedPieces);
     j.endObject();
   }
 

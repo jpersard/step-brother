@@ -47,7 +47,9 @@ Wichtige Optionen (`sb-bench.exe --help` zeigt alle):
 
 | Option | Bedeutung |
 | --- | --- |
-| `--healing default\|off\|no-shell-orient` | Shape-Healing normal, ganz aus, oder nur `FixShellOrientationMode` aus |
+| `--healing default\|off\|no-shell-orient` | Shape-Healing im OCCT-Transfer: normal, ganz aus, oder nur `FixShellOrientationMode` aus |
+| `--healing parallel` | ohne Healing lesen, danach volles Healing parallel über alle Prototypen |
+| `--healing pcurves` | ohne Healing lesen, danach nur Kantenkurven reparieren (parallel) |
 | `--per-root` | Wurzeln einzeln mit `TransferOneRoot` übertragen |
 | `--no-mesh` | Vernetzung auslassen (schneller, nur Lesen messen) |
 | `--deflection 0.01,0.003,0.001` | relative Vernetzungstoleranzen |

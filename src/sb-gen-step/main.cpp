@@ -13,6 +13,8 @@
 #include <Message_Messenger.hxx>
 #include <Message_Printer.hxx>
 #include <Quantity_Color.hxx>
+#include <Interface_Static.hxx>
+#include <STEPCAFControl_Controller.hxx>
 #include <STEPCAFControl_Writer.hxx>
 #include <STEPControl_StepModelType.hxx>
 #include <Standard_Failure.hxx>
@@ -67,6 +69,7 @@ int run(const std::vector<std::string>& args) {
   int holes = 4;
   double offset = 0.0;
   bool force = false;
+  bool noPCurves = false;
   std::string out;
   for (std::size_t i = 1; i < args.size(); ++i) {
     const std::string& a = args[i];
@@ -74,6 +77,7 @@ int run(const std::vector<std::string>& args) {
     else if (a == "--holes" && i + 1 < args.size()) holes = std::stoi(args[++i]);
     else if (a == "--offset" && i + 1 < args.size()) offset = std::stod(args[++i]);
     else if (a == "--force") force = true;
+    else if (a == "--no-pcurves") noPCurves = true;
     else if (a[0] != '-' && out.empty()) out = a;
     else {
       std::cerr << "Unbekanntes Argument: " << a << "\n";
@@ -82,10 +86,11 @@ int run(const std::vector<std::string>& args) {
     }
   }
   if (out.empty() || grid < 1 || holes < 1) {
-    std::cerr << "Aufruf: sb-gen-step <ausgabe.stp> [--grid N] [--holes N] [--offset mm] [--force]\n"
+    std::cerr << "Aufruf: sb-gen-step <ausgabe.stp> [--grid N] [--holes N] [--offset mm] [--no-pcurves] [--force]\n"
                  "  --grid N     N x N Module (Standard 10)\n"
                  "  --holes N    N x N Bohrungen je Platte (Standard 4)\n"
                  "  --offset mm  ganze Anlage vom Ursprung wegschieben (Float-Genauigkeit testen)\n"
+                 "  --no-pcurves 2D-Randkurven weglassen (wie manche CAD-Exporte; testet Healing)\n"
                  "  --force      vorhandene Datei ueberschreiben\n"
                  "Zum Messen einer STEP-Datei ist sb-bench da, nicht dieses Programm.\n";
     return 2;
@@ -148,6 +153,8 @@ int run(const std::vector<std::string>& args) {
   }
   shapes->UpdateAssemblies();
 
+  STEPCAFControl_Controller::Init();
+  if (noPCurves) Interface_Static::SetIVal("write.surfacecurve.mode", 0);
   STEPCAFControl_Writer writer;
   writer.SetNameMode(true);
   writer.SetColorMode(true);

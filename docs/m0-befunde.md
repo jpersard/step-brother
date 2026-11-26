@@ -77,13 +77,27 @@ berichtete Faktor 2–3 zugunsten von GCC (OCCT-Issue 32014) tritt mit OCCT 8 ni
 beim Programmende (Abschnitt 4), zusätzliche Laufzeit-DLLs und einen aufwendigeren
 Build mit. clang-cl bietet keinen messbaren Vorteil.
 
-### Offener Punkt: unbegrenzte Elemente ohne Healing
+### Ohne Healing fehlen Kantenkurven – Healing ist Pflicht
 
-Ohne Healing zählt `sb-bench` 155.506 Flächen und Kanten ohne endliche Ausdehnung.
-Vermutung: Vielen Flächen fehlen die 2D-Randkurven (pcurves), die das Healing sonst
-ergänzt. Ob die Vernetzung darunter leidet, zeigt die Messung mit Healing aus und
-Vernetzung (`faces_without_mesh`). Falls ja, braucht der Importer ein gezieltes,
-schnelles Teil-Healing statt des vollen `FixShape`.
+Ohne Healing bleiben **100.811 von 192.937 Flächen ohne Netz** (52 %, mit Healing: 98).
+Gleichzeitig meldet `sb-bench` 155.506 Elemente ohne endliche Ausdehnung. Ursache: Der
+Datei fehlen bei vielen Flächen die 2D-Randkurven (pcurves), die das Healing sonst
+ergänzt.
+
+Nachgestellt mit `sb-gen-step --no-pcurves` (OCCT-Schalter `write.surfacecurve.mode = 0`):
+
+| `--healing` | Flächen ohne Netz | unbegrenzte Elemente |
+| --- | ---: | ---: |
+| `default` (OCCT-Healing im Transfer, seriell) | 0 | 0 |
+| `off` | 37 | 15.200 |
+| `pcurves`, nur `ShapeFix_Edge::FixAddPCurve` | 37 | 0 |
+| **`pcurves`, `ShapeFix_Wire::FixEdgeCurves` je Drahtzug** | **0** | 0 |
+| **`parallel`, volles `ShapeFix_Shape` je Prototyp** | **0** | 0 |
+
+Beide eigenen Modi lesen ohne Healing (schnell) und reparieren danach parallel über alle
+Prototypen. Nur Randkurven zu ergänzen reicht nicht; die Kantenreparatur je Drahtzug
+(pcurves, Seam-Kanten, SameParameter, Toleranzen) schon. Wie schnell die beiden Modi
+mit der echten Anlage sind, misst `scripts/m0-messung.ps1 -Reihe healing`.
 
 ## 1. Transfer wächst quadratisch mit der Wiederverwendung eines Teils
 

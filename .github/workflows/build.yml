@@ -155,6 +155,15 @@ jobs:
           if ($r.structure.prototypes -ne 3) { throw "Erwartet 3 Prototypen, gefunden $($r.structure.prototypes)" }
           if ($r.structure.part_instances -ne 175) { throw "Erwartet 175 Instanzen, gefunden $($r.structure.part_instances)" }
           Get-Content bench.json
+          # Datei ohne 2D-Randkurven (wie manche CAD-Exporte): eigenes Healing muss sie reparieren
+          & "$dist/sb-gen-step.exe" nopc.stp --grid 5 --holes 3 --no-pcurves --force
+          if ($LASTEXITCODE -ne 0) { throw "sb-gen-step --no-pcurves fehlgeschlagen" }
+          foreach ($mode in 'pcurves', 'parallel') {
+            & "$dist/sb-bench.exe" nopc.stp --healing $mode --deflection 0.003 --json "nopc-$mode.json"
+            if ($LASTEXITCODE -ne 0) { throw "sb-bench --healing $mode fehlgeschlagen" }
+            $m = (Get-Content "nopc-$mode.json" | ConvertFrom-Json).mesh[0]
+            if ($m.faces_without_mesh -ne 0) { throw "--healing ${mode}: $($m.faces_without_mesh) Flaechen ohne Netz" }
+          }
 
       - uses: actions/upload-artifact@v4
         with:

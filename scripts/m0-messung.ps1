@@ -5,13 +5,15 @@
 #
 # Aufruf (PowerShell, im Ordner mit den entpackten Varianten):
 #   powershell -ExecutionPolicy Bypass -File .\m0-messung.ps1 -Step "C:\Pfad\anlage.stp"
+#   ... -Reihe healing   misst nur die eigenen Healing-Modi (pcurves, parallel) mit MSVC
 #
 # Erwartet die entpackten Ordner step-brother-m0-windows-msvc, -clang-cl und -mingw im
 # selben Ordner wie dieses Skript (fehlende Varianten werden uebersprungen).
 
 param(
   [Parameter(Mandatory = $true)][string]$Step,
-  [int]$Wiederholungen = 2
+  [int]$Wiederholungen = 2,
+  [ValidateSet('m0', 'healing')][string]$Reihe = 'm0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,13 +37,20 @@ function Messe([string]$variante, [string]$name, [string[]]$optionen) {
   Write-Host "   fertig nach $dauer s (Exit-Code $LASTEXITCODE)"
 }
 
-# 1. Qualitaet ohne Healing (mit Vernetzung)
-Messe 'msvc' 'healing-aus-netz' @('--healing', 'off', '--deflection', '0.01,0.003')
+if ($Reihe -eq 'healing') {
+  # Eigenes Healing nach dem Lesen, parallel ueber Prototypen - mit Vernetzung
+  foreach ($modus in 'pcurves', 'parallel') {
+    Messe 'msvc' "healing-$modus" @('--healing', $modus, '--deflection', '0.01,0.003')
+  }
+} else {
+  # 1. Qualitaet ohne Healing (mit Vernetzung)
+  Messe 'msvc' 'healing-aus-netz' @('--healing', 'off', '--deflection', '0.01,0.003')
 
-# 2. Compiler-Vergleich: nur Lesen, ohne Healing, mehrfach
-for ($i = 1; $i -le $Wiederholungen; $i++) {
-  foreach ($v in 'msvc', 'clang-cl', 'mingw') {
-    Messe $v "lesen-$i" @('--healing', 'off', '--no-mesh')
+  # 2. Compiler-Vergleich: nur Lesen, ohne Healing, mehrfach
+  for ($i = 1; $i -le $Wiederholungen; $i++) {
+    foreach ($v in 'msvc', 'clang-cl', 'mingw') {
+      Messe $v "lesen-$i" @('--healing', 'off', '--no-mesh')
+    }
   }
 }
 

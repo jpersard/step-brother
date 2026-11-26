@@ -26,6 +26,11 @@
 #include <Poly_Triangulation.hxx>
 #include <STEPCAFControl_Reader.hxx>
 #include <ShapeProcess.hxx>
+#include <TopoDS_Edge.hxx>
+#include <ShapeFix_Shape.hxx>
+#include <Precision.hxx>
+#include <ShapeFix_Wire.hxx>
+#include <TopoDS_Wire.hxx>
 #include <Standard_Failure.hxx>
 #include <Standard_Version.hxx>
 #include <TDF_Label.hxx>
@@ -65,7 +70,9 @@ namespace {
 // ---------------------------------------------------------------------------
 // Optionen
 
-enum class Healing { Default, Off, NoShellOrientation };
+// Default/Off/NoShellOrientation steuern das Healing im OCCT-Transfer (seriell).
+// Parallel und PCurves lesen ohne Healing und heilen danach selbst, parallel ueber Prototypen.
+enum class Healing { Default, Off, NoShellOrientation, Parallel, PCurves };
 
 struct Options {
   std::string file;            // UTF-8
@@ -89,7 +96,12 @@ Aufruf:  sb-bench <datei.stp> [Optionen]
 
 Optionen:
   --json <datei>          Ergebnis als JSON in Datei schreiben (sonst auf stdout)
-  --healing <modus>       default | off | no-shell-orient   (Standard: default)
+  --healing <modus>       default | off | no-shell-orient | parallel | pcurves
+                          parallel: ohne Healing lesen, danach volles ShapeFix
+                                    parallel ueber alle Prototypen
+                          pcurves:  ohne Healing lesen, danach nur die Kanten-
+                                    kurven reparieren (2D-Randkurven, Same-
+                                    Parameter), parallel ueber Prototypen
   --per-root              Wurzeln einzeln mit TransferOneRoot uebertragen
   --all-attributes        auch Layer, Eigenschaften, GD&T, Material, Ansichten lesen
   --no-names              keine Namen lesen
@@ -131,6 +143,8 @@ std::optional<Options> parseArgs(const std::vector<std::string>& args) {
       if (m == "default") opt.healing = Healing::Default;
       else if (m == "off") opt.healing = Healing::Off;
       else if (m == "no-shell-orient") opt.healing = Healing::NoShellOrientation;
+      else if (m == "parallel") opt.healing = Healing::Parallel;
+      else if (m == "pcurves") opt.healing = Healing::PCurves;
       else throw std::runtime_error("Unbekannter Healing-Modus: " + m);
     } else if (a == "--per-root") {
       opt.perRoot = true;
@@ -166,6 +180,8 @@ const char* healingName(Healing h) {
   switch (h) {
     case Healing::Off: return "off";
     case Healing::NoShellOrientation: return "no-shell-orient";
+    case Healing::Parallel: return "parallel";
+    case Healing::PCurves: return "pcurves";
     default: return "default";
   }
 }
@@ -308,6 +324,76 @@ Structure analyze(const occ::handle<XCAFDoc_ShapeTool>& shapeTool) {
 }
 
 // ---------------------------------------------------------------------------
+// Eigenes Healing, parallel ueber Prototypen
+
+struct HealStats {
+  std::uint64_t changedPrototypes = 0;
+  std::uint64_t failedPrototypes = 0;
+  std::uint64_t addedPCurves = 0;  // vor der Reparatur fehlende 2D-Randkurven
+};
+
+// Ergaenzt fehlende 2D-Randkurven (pcurves) aller Kanten einer Form. Aendert die Form
+// an Ort und Stelle (die Kanten bekommen zusaetzliche Kurven). Liefert die Anzahl.
+std::uint64_t addMissingPCurves(const TopoDS_Shape& shape) {
+  std::uint64_t added = 0;
+  for (TopExp_Explorer fx(shape, TopAbs_FACE); fx.More(); fx.Next()) {
+    const TopoDS_Face face = TopoDS::Face(fx.Current());
+    // Fehlende pcurves zaehlen (fuer die Statistik) ...
+    for (TopExp_Explorer ex(face, TopAbs_EDGE); ex.More(); ex.Next()) {
+      double first = 0.0, last = 0.0;
+      if (BRep_Tool::CurveOnSurface(TopoDS::Edge(ex.Current()), face, first, last).IsNull()) ++added;
+    }
+    // ... und je Drahtzug die Kantenkurven reparieren: pcurves ergaenzen, Seam-Kanten,
+    // SameParameter, Vertex-Toleranzen. Deutlich weniger als das volle ShapeFix_Shape.
+    for (TopExp_Explorer wx(face, TopAbs_WIRE); wx.More(); wx.Next()) {
+      ShapeFix_Wire fixWire(TopoDS::Wire(wx.Current()), face, Precision::Confusion());
+      fixWire.FixEdgeCurves();
+    }
+  }
+  return added;
+}
+
+HealStats healPrototypes(const Structure& s, const occ::handle<XCAFDoc_ShapeTool>& shapeTool,
+                         bool pcurvesOnly) {
+  HealStats stats;
+  const std::size_t n = s.prototypeLabels.size();
+  std::vector<TopoDS_Shape> input(n), output(n);
+  std::vector<std::uint64_t> added(n, 0);
+  std::vector<char> failed(n, 0);
+  for (std::size_t i = 0; i < n; ++i) input[i] = XCAFDoc_ShapeTool::GetShape(s.prototypeLabels[i]);
+
+  OSD_Parallel::For(0, static_cast<int>(n), [&](int i) {
+    try {
+      if (pcurvesOnly) {
+        added[i] = addMissingPCurves(input[i]);
+        output[i] = input[i];
+      } else {
+        occ::handle<ShapeFix_Shape> fix = new ShapeFix_Shape(input[i]);
+        fix->Perform();
+        output[i] = fix->Shape();
+      }
+    } catch (const Standard_Failure&) {
+      failed[i] = 1;
+      output[i] = input[i];
+    }
+  });
+
+  // Ergebnisse seriell zurueck ins Dokument (OCAF ist nicht thread-sicher).
+  for (std::size_t i = 0; i < n; ++i) {
+    stats.addedPCurves += added[i];
+    stats.failedPrototypes += failed[i];
+    if (!output[i].IsSame(input[i])) {
+      shapeTool->SetShape(s.prototypeLabels[i], output[i]);
+      ++stats.changedPrototypes;
+    } else if (added[i] > 0) {
+      ++stats.changedPrototypes;
+    }
+  }
+  shapeTool->UpdateAssemblies();
+  return stats;
+}
+
+// ---------------------------------------------------------------------------
 // Vernetzung
 
 struct MeshResult {
@@ -415,6 +501,7 @@ int run(const std::vector<std::string>& args) {
   XCAFApp_Application::GetApplication()->NewDocument("BinXCAF", doc);
 
   Structure structure;
+  HealStats healStats;
   bool ok = true;
   std::string error;
 
@@ -443,7 +530,8 @@ int run(const std::vector<std::string>& args) {
           mib(phases.back().memAfter.peak));
 
       // Healing nach dem Lesen setzen: Dann existiert der Actor sicher.
-      if (opt.healing == Healing::Off) {
+      if (opt.healing == Healing::Off || opt.healing == Healing::Parallel ||
+          opt.healing == Healing::PCurves) {
         reader->SetShapeProcessFlags(ShapeProcess::OperationsFlags{});
       } else if (opt.healing == Healing::NoShellOrientation) {
         DE_ShapeFixParameters fix;
@@ -483,6 +571,18 @@ int run(const std::vector<std::string>& args) {
     log("  " + std::to_string(structure.prototypes) + " Prototypen, " +
         std::to_string(structure.partInstances) + " Teile-Instanzen, " +
         std::to_string(structure.assemblies) + " Baugruppen");
+
+    if (opt.healing == Healing::Parallel || opt.healing == Healing::PCurves) {
+      log(std::string("Phase 4b: eigenes Healing (") + healingName(opt.healing) + ", parallel) ...");
+      t = Clock::now();
+      healStats = healPrototypes(structure, XCAFDoc_DocumentTool::ShapeTool(doc->Main()),
+                                 opt.healing == Healing::PCurves);
+      phases.push_back({"heal", secondsSince(t), sb::queryMemory()});
+      log("  " + std::to_string(phases.back().seconds) + " s, " +
+          std::to_string(healStats.changedPrototypes) + " Prototypen geaendert, " +
+          std::to_string(healStats.addedPCurves) + " pcurves ergaenzt, " +
+          std::to_string(healStats.failedPrototypes) + " Fehler");
+    }
   } catch (const Standard_Failure& e) {
     ok = false;
     error = std::string("OCCT: ") + e.what();
@@ -591,6 +691,11 @@ int run(const std::vector<std::string>& args) {
   j.value("components", structure.components);
   j.value("part_instances", structure.partInstances);
   j.value("max_depth", structure.maxDepth);
+  if (opt.healing == Healing::Parallel || opt.healing == Healing::PCurves) {
+    j.value("healed_prototypes", healStats.changedPrototypes);
+    j.value("heal_failed_prototypes", healStats.failedPrototypes);
+    j.value("added_pcurves", healStats.addedPCurves);
+  }
   j.value("max_direct_reuse", structure.maxDirectReuse);
   j.value("max_part_occurrences", structure.maxOccurrences);
   j.value("prototype_faces", structure.prototypeFaces);

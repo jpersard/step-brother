@@ -147,7 +147,7 @@ jobs:
           $dist = "dist/step-brother-m0-${{ matrix.preset }}"
           # Ohne MSYS2/VS im PATH testen, damit fehlende DLLs auffallen
           $env:PATH = "$((Resolve-Path $dist).Path);C:\Windows\System32;C:\Windows"
-          & "$dist/sb-gen-step.exe" test.stp --grid 5 --holes 3
+          & "$dist/sb-gen-step.exe" test.stp --grid 5 --holes 3 --force
           if ($LASTEXITCODE -ne 0) { throw "sb-gen-step fehlgeschlagen" }
           & "$dist/sb-bench.exe" test.stp --json bench.json
           if ($LASTEXITCODE -ne 0) { throw "sb-bench fehlgeschlagen" }

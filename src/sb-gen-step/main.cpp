@@ -28,6 +28,7 @@
 #include <gp_Ax2.hxx>
 #include <gp_Trsf.hxx>
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -65,12 +66,14 @@ int run(const std::vector<std::string>& args) {
   int grid = 10;
   int holes = 4;
   double offset = 0.0;
+  bool force = false;
   std::string out;
   for (std::size_t i = 1; i < args.size(); ++i) {
     const std::string& a = args[i];
     if (a == "--grid" && i + 1 < args.size()) grid = std::stoi(args[++i]);
     else if (a == "--holes" && i + 1 < args.size()) holes = std::stoi(args[++i]);
     else if (a == "--offset" && i + 1 < args.size()) offset = std::stod(args[++i]);
+    else if (a == "--force") force = true;
     else if (a[0] != '-' && out.empty()) out = a;
     else {
       std::cerr << "Unbekanntes Argument: " << a << "\n";
@@ -79,11 +82,23 @@ int run(const std::vector<std::string>& args) {
     }
   }
   if (out.empty() || grid < 1 || holes < 1) {
-    std::cerr << "Aufruf: sb-gen-step <ausgabe.stp> [--grid N] [--holes N] [--offset mm]\n"
+    std::cerr << "Aufruf: sb-gen-step <ausgabe.stp> [--grid N] [--holes N] [--offset mm] [--force]\n"
                  "  --grid N     N x N Module (Standard 10)\n"
                  "  --holes N    N x N Bohrungen je Platte (Standard 4)\n"
-                 "  --offset mm  ganze Anlage vom Ursprung wegschieben (Float-Genauigkeit testen)\n";
+                 "  --offset mm  ganze Anlage vom Ursprung wegschieben (Float-Genauigkeit testen)\n"
+                 "  --force      vorhandene Datei ueberschreiben\n"
+                 "Zum Messen einer STEP-Datei ist sb-bench da, nicht dieses Programm.\n";
     return 2;
+  }
+  // Schutz vor Verwechslung mit sb-bench: niemals eine vorhandene (echte) STEP-Datei ueberschreiben.
+  {
+    std::error_code ec;
+    if (!force && std::filesystem::exists(std::filesystem::u8path(out), ec)) {
+      std::cerr << "Abbruch: " << out << " existiert bereits und wird nicht ueberschrieben.\n"
+                   "Zum Messen einer STEP-Datei: sb-bench " << out << "\n"
+                   "Zum Ueberschreiben einer Testdatei: --force angeben.\n";
+      return 2;
+    }
   }
 
   // OCCT-Statistikausgaben unterdruecken
